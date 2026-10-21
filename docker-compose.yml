@@ -1,0 +1,3 @@
+# Local environment: localstack, api, worker (spec section 9).
+# LocalStack image version pending a check of its current free-tier terms.
+services: {}

@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sast/backend
+    steps:
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-node@v5.0.0
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm test
+      # Docker build step added once the Dockerfile is implemented

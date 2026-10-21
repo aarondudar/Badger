@@ -1,3 +1,9 @@
 node_modules/
 .env
 .DS_Store
+# Temp clone directories
+tmp/
+.clones/
+# LocalStack data
+.localstack/
+volume/
