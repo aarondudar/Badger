@@ -1,3 +1,39 @@
-# Local environment: localstack, api, worker (spec section 9).
-# LocalStack image version pending a check of its current free-tier terms.
-services: {}
+# Local environment (spec section 9): AWS emulator, API, and worker.
+# Floci stands in for LocalStack, which now requires an auth token (docs/decisions/0001).
+services:
+  localstack:
+    # -compat includes the AWS CLI used by infra/localstack/init.sh
+    image: floci/floci:2.3.0-compat
+    ports:
+      - "4566:4566"
+    # Region, dummy credentials, and resource names for init.sh
+    env_file: .env
+    environment:
+      # Make returned URLs (e.g. SQS QueueUrl) resolve from other containers
+      FLOCI_HOSTNAME: localstack
+    volumes:
+      - ./infra/localstack/init.sh:/etc/localstack/init/ready.d/init.sh:ro
+    healthcheck:
+      # Healthy only once init.sh has created the queue, table, and bucket
+      test: ["CMD-SHELL", "aws --endpoint-url http://localhost:4566 s3api head-bucket --bucket $${BUCKET_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  api:
+    build: ./sast/backend
+    env_file: .env
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    depends_on:
+      localstack:
+        condition: service_healthy
+
+  worker:
+    build: ./sast/backend
+    command: ["npm", "run", "worker"]
+    env_file: .env
+    depends_on:
+      localstack:
+        condition: service_healthy
