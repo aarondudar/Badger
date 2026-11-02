@@ -98,7 +98,7 @@ Verified: `api_key = "FAKE_API_KEY_FOR_TESTS"` does **not** match, because under
 
 - `"type": "module"` (ESM), entry `server.js`.
 - Dependencies: `express ^4.18.2`, `cors ^2.8.5`. No dev dependencies.
-- No `engines` field, so the Docker base should be the current Node LTS slim image; CI is set to Node 24.
+- No `engines` field, so the Docker base should be the current Node LTS slim image; CI and the Dockerfile use Node 26 (LTS since 2026-10-28).
 - No test runner and no tests. Plan: Node's built-in `node:test`.
 - `test-vulnerable.js` is a sample vulnerable file, not a test. Node's default `--test` glob matches `test-*.js` and would execute it, so the `npm test` script is scoped to `test/**/*.test.js`.
 
@@ -120,18 +120,20 @@ Scale: scanning the provided `scanner.js` itself yields 73 findings, 60 of them 
 
 **Impact on grading:** with the spec's weights (medium = 4), around three false `WEAK_CRYPTO` hits drop a repo below an A, and a typical real project with tests (`describe`) and array code (`includes`) will score D or F regardless of actual security. The `clean-js` fixture can only reach an A if it avoids common words containing "des" and any `.exec(` call.
 
-## Open decisions
+## Decisions
 
-1. **Missing critical severity.** Recommended: drop `critical` from `counts` and the weights, grading on `high`, `medium`, `low`. Alternative: keep `critical: 0` to match the spec's shape.
-2. **Scanner false positives.** Options:
+1. **Missing critical severity.** Decided (2026-11-02): drop `critical` from `counts` and the weights, grading on `high`, `medium`, `low`.
+2. **Scanner false positives.** Still open. Options:
    - Leave the scanner unchanged (strictest reading of "extend, not replace") and accept skewed grades.
    - Fix the patterns (word boundaries on cipher names, exclude `.exec(` method calls, de-duplicate overlapping rules) in a separate, clearly labeled commit.
    - Leave the rules alone but weight or filter specific rule IDs in our grading code.
-3. **TypeScript.** Whether `.ts` files count toward `jsFilesScanned` and the grade.
+3. **TypeScript.** Decided (2026-11-02): `.ts` files are scanned and count toward `jsFilesScanned` and the grade.
 
-## Next steps (pending decisions)
+Both decisions are reflected in [`contracts.md`](contracts.md).
+
+## Next steps
 
 - Split `server.js` into `app.js` + `server.js` and add regression tests for existing routes.
-- Write `docs/contracts.md` with the real report shape and the deviations above.
-- Implement the worker's file walk with the spec's exclusions (`node_modules`, `.git`, `*.min.js`).
-- Check LocalStack's current free-tier terms before pinning an image.
+- Implement the worker's file walk with the exclusions in `contracts.md` (`node_modules`, dot-directories, `*.min.js`).
+- Done: `docs/contracts.md` written with the real report shape and deviations.
+- Done: LocalStack terms checked. It now requires an auth token, so local dev uses Floci instead ([decision 0001](decisions/0001-localstack-for-local-dev.md)).
