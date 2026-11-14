@@ -165,11 +165,11 @@ export const scanCode = (code, filename = 'untitled.js') => {
     for (const pattern of rule.patterns) {
       let match;
       const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
-      
+
       while ((match = regex.exec(code)) !== null) {
         const lineNumber = getLineNumber(code, match.index);
         const lineContent = getLineContent(code, lineNumber);
-        
+
         vulnerabilities.push({
           id: rule.id,
           name: rule.name,
@@ -207,13 +207,17 @@ export const scanFile = (filepath) => {
   return scanCode(code, filepath);
 };
 
-// Scan a directory recursively
-export const scanDirectory = (dirpath, extensions = ['.js', '.mjs', '.cjs', '.ts']) => {
+// Scan a directory and return both findings and the number of JS files scanned.
+export const scanDirectoryWithStats = (
+  dirpath,
+  extensions = ['.js', '.mjs', '.cjs', '.ts']
+) => {
   if (!fs.existsSync(dirpath)) {
     throw new Error(`Directory not found: ${dirpath}`);
   }
 
   const results = {};
+  let filesScanned = 0;
 
   const scanDir = (currentPath) => {
     const entries = fs.readdirSync(currentPath, { withFileTypes: true });
@@ -221,7 +225,7 @@ export const scanDirectory = (dirpath, extensions = ['.js', '.mjs', '.cjs', '.ts
     for (const entry of entries) {
       const fullPath = path.join(currentPath, entry.name);
 
-      // Skip node_modules and hidden directories
+      // Skip dependencies and hidden directories.
       if (entry.isDirectory()) {
         if (entry.name === 'node_modules' || entry.name.startsWith('.')) {
           continue;
@@ -229,8 +233,15 @@ export const scanDirectory = (dirpath, extensions = ['.js', '.mjs', '.cjs', '.ts
         scanDir(fullPath);
       } else if (entry.isFile()) {
         const ext = path.extname(entry.name).toLowerCase();
-        if (extensions.includes(ext)) {
+
+        if (
+          extensions.includes(ext) &&
+          !entry.name.toLowerCase().endsWith('.min.js')
+        ) {
+          filesScanned++;
+
           const vulnerabilities = scanFile(fullPath);
+
           if (vulnerabilities.length > 0) {
             results[fullPath] = vulnerabilities;
           }
@@ -240,7 +251,13 @@ export const scanDirectory = (dirpath, extensions = ['.js', '.mjs', '.cjs', '.ts
   };
 
   scanDir(dirpath);
-  return results;
+
+  return { results, filesScanned };
 };
 
-export default { scanCode, scanFile, scanDirectory };
+// Keep the original function and return format for existing API routes.
+export const scanDirectory = (dirpath, extensions) => {
+  return scanDirectoryWithStats(dirpath, extensions).results;
+};
+
+export default { scanCode, scanFile, scanDirectory, scanDirectoryWithStats };
