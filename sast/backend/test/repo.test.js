@@ -4,6 +4,12 @@ import { normalizeRepoUrl } from '../validate.js';
 
 const ORIGIN = 'https://badger.example';
 process.env.ALLOWED_ORIGINS = ORIGIN;
+// These tests use the in-memory store and queue, whatever the shell has set.
+// (With TABLE_NAME/QUEUE_URL exported for the integration test, server.js
+// would otherwise pick DynamoDB/SQS.) node --test runs each file in its own
+// process, so this doesn't affect test/aws-integration.test.js.
+delete process.env.TABLE_NAME;
+delete process.env.QUEUE_URL;
 const { default: app, store, queue } = await import('../server.js');
 
 let server, base;
