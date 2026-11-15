@@ -2,6 +2,10 @@ import crypto from 'node:crypto';
 
 export const createMemoryStore = () => {
   const scans = new Map();
+  // scanIds start with an ISO timestamp, so string order is time order.
+  const newestFirst = (repo) => [...scans.values()]
+    .filter((scan) => scan.repo === repo)
+    .sort((a, b) => b.scanId.localeCompare(a.scanId));
 
   return {
     async createScan(repo) {
@@ -15,16 +19,23 @@ export const createMemoryStore = () => {
       scans.set(`${repo}:${scan.scanId}`, scan);
       return scan;
     },
+    // Newest record of any status (GET /grade).
     async getLatest(repo) {
-      return [...scans.values()]
-        .filter((scan) => scan.repo === repo)
-        .sort((a, b) => b.scanId.localeCompare(a.scanId))[0] ?? null;
+      return newestFirst(repo)[0] ?? null;
+    },
+    // Newest COMPLETE record (badge), so a rescan in progress doesn't hide the last grade.
+    async getLatestComplete(repo) {
+      return newestFirst(repo).find((scan) => scan.status === 'complete') ?? null;
+    },
+    // What the worker does as a scan moves through running -> complete | failed.
+    async updateScan(repo, scanId, fields) {
+      const scan = scans.get(`${repo}:${scanId}`);
+      if (!scan) return null;
+      Object.assign(scan, fields);
+      return scan;
     },
     async getHistory(repo) {
-      return [...scans.values()]
-        .filter((scan) => scan.repo === repo)
-        .sort((a, b) => b.scanId.localeCompare(a.scanId))
-        .slice(0, 20);
+      return newestFirst(repo).slice(0, 20);
     },
   };
 };

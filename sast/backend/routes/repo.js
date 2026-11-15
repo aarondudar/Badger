@@ -53,9 +53,13 @@ export const createRepoRouter = ({ store, queue, allowedOrigins = [] }) => {
   // Badges are open on purpose: READMEs load them through GitHub's image proxy.
   router.get('/badge/:owner/:repo', async (req, res, next) => {
     try {
-      const scan = await store.getLatest(`${req.params.owner}/${req.params.repo}`.toLowerCase());
-      const value = scan?.status === 'complete' ? scan.grade :
-        scan?.status === 'queued' || scan?.status === 'running' ? 'scanning' : 'unknown';
+      // Precedence from docs/contracts.md: newest complete grade (or N/A),
+      // else "scanning" while one is queued/running, else "unknown".
+      const repo = `${req.params.owner}/${req.params.repo}`.toLowerCase();
+      const complete = await store.getLatestComplete(repo);
+      const latest = complete ? null : await store.getLatest(repo);
+      const value = complete ? complete.grade :
+        latest?.status === 'queued' || latest?.status === 'running' ? 'scanning' : 'unknown';
       res.set('Content-Type', 'image/svg+xml');
       res.set('Cache-Control', 'max-age=300');
       return res.send(renderBadge(value));
