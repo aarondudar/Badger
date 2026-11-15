@@ -3,10 +3,41 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Repo Report Card</title>
+  <title>Badger</title>
 </head>
 <body>
-  <h1>Repo Report Card</h1>
-  <!-- Placeholder: submit form, polling, grade display, badge snippet (spec section 8) -->
+  <h1>Badger</h1>
+  <p>Get a security grade badge for any public GitHub repository.</p>
+  <form id="scan-form">
+    <input id="repo-url" type="url" placeholder="https://github.com/owner/repo" required>
+    <button>Scan</button>
+  </form>
+  <p id="result" hidden></p>
+  <script>
+    const form = document.getElementById('scan-form');
+    const result = document.getElementById('result');
+    const show = (message) => { result.hidden = false; result.textContent = message; };
+    const poll = async (repo) => {
+      const response = await fetch(`/grade/${repo}`);
+      const scan = await response.json();
+      if (scan.status === 'complete' || scan.status === 'failed') {
+        show(scan.status === 'complete' ? `Grade: ${scan.grade} (score ${scan.score})` : `Scan failed: ${scan.error}`);
+        return;
+      }
+      show(`Scan ${scan.status}...`);
+      setTimeout(() => poll(repo), 3000);
+    };
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const response = await fetch('/scan/repo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repoUrl: document.getElementById('repo-url').value }),
+      });
+      const scan = await response.json();
+      if (!response.ok) return show(scan.error);
+      poll(scan.repo);
+    });
+  </script>
 </body>
 </html>

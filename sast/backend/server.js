@@ -1,13 +1,24 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { scanCode, scanFile, scanDirectory } from './scanner.js';
+import { createRepoRouter } from './routes/repo.js';
+import { createMemoryQueue, createMemoryStore } from './store.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+app.use(createRepoRouter({
+  store: createMemoryStore(),
+  queue: createMemoryQueue(),
+  allowedOrigins: (process.env.ALLOWED_ORIGINS || `http://localhost:${PORT}`).split(','),
+}));
+app.use(express.static(path.resolve(__dirname, '../../frontend')));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
