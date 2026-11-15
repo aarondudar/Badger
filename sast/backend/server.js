@@ -11,13 +11,16 @@ const PORT = process.env.PORT || 3000;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Middleware
-app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+// Repo routes are mounted BEFORE the global cors() below, so their origin
+// allow-list decides CORS for them; the open cors() then only covers the
+// provided SAST routes.
 app.use(createRepoRouter({
   store: createMemoryStore(),
   queue: createMemoryQueue(),
   allowedOrigins: (process.env.ALLOWED_ORIGINS || `http://localhost:${PORT}`).split(','),
 }));
+app.use(cors());
 app.use(express.static(path.resolve(__dirname, '../../frontend')));
 
 // Health check endpoint

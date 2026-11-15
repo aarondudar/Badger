@@ -11,6 +11,9 @@ export const createRepoRouter = ({ store, queue, allowedOrigins = [] }) => {
   };
   const apiCors = cors({ origin: corsOrigin, methods: ['GET', 'POST'] });
 
+  // Browser preflight for the JSON POST must be answered by the allow-list too.
+  router.options('/scan/repo', apiCors);
+
   router.post('/scan/repo', apiCors, async (req, res, next) => {
     try {
       const repo = normalizeRepoUrl(req.body?.repoUrl);
@@ -29,7 +32,7 @@ export const createRepoRouter = ({ store, queue, allowedOrigins = [] }) => {
     }
   });
 
-  router.get('/grade/:owner/:repo', async (req, res, next) => {
+  router.get('/grade/:owner/:repo', apiCors, async (req, res, next) => {
     try {
       const scan = await store.getLatest(`${req.params.owner}/${req.params.repo}`.toLowerCase());
       return scan ? res.json(scan) : res.status(404).json({ error: 'scan not found' });
@@ -38,7 +41,7 @@ export const createRepoRouter = ({ store, queue, allowedOrigins = [] }) => {
     }
   });
 
-  router.get('/grade/:owner/:repo/history', async (req, res, next) => {
+  router.get('/grade/:owner/:repo/history', apiCors, async (req, res, next) => {
     try {
       const repo = `${req.params.owner}/${req.params.repo}`.toLowerCase();
       return res.json({ repo, scans: await store.getHistory(repo) });
@@ -47,6 +50,7 @@ export const createRepoRouter = ({ store, queue, allowedOrigins = [] }) => {
     }
   });
 
+  // Badges are open on purpose: READMEs load them through GitHub's image proxy.
   router.get('/badge/:owner/:repo', async (req, res, next) => {
     try {
       const scan = await store.getLatest(`${req.params.owner}/${req.params.repo}`.toLowerCase());
