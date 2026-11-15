@@ -15,9 +15,12 @@ app.use(express.json({ limit: '10mb' }));
 // Repo routes are mounted BEFORE the global cors() below, so their origin
 // allow-list decides CORS for them; the open cors() then only covers the
 // provided SAST routes.
+// Exported so tests can drive the real app; swapped for AWS adapters later.
+export const store = createMemoryStore();
+export const queue = createMemoryQueue();
 app.use(createRepoRouter({
-  store: createMemoryStore(),
-  queue: createMemoryQueue(),
+  store,
+  queue,
   allowedOrigins: (process.env.ALLOWED_ORIGINS || `http://localhost:${PORT}`).split(','),
 }));
 app.use(cors());
@@ -212,8 +215,11 @@ app.get('/vulnerabilities', (req, res) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
+export default app;
+
+// Start server only when run directly (npm start / docker), not when imported by tests.
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) app.listen(PORT, () => {
   console.log(`
   ╔═══════════════════════════════════════════╗
   ║         SAST Scanner Server               ║
