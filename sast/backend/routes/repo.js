@@ -19,13 +19,24 @@ export const createRepoRouter = ({ store, queue, allowedOrigins = [] }) => {
       const repo = normalizeRepoUrl(req.body?.repoUrl);
       if (!repo.ok) return res.status(400).json({ error: repo.error });
       const scan = await store.createScan(repo.repo);
-      await queue.send({
-        version: 1,
-        scanId: scan.scanId,
-        repo: scan.repo,
-        repoUrl: repo.url,
-        requestedAt: scan.requestedAt,
-      });
+      try {
+        await queue.send({
+          version: 1,
+          scanId: scan.scanId,
+          repo: scan.repo,
+          repoUrl: repo.url,
+          requestedAt: scan.requestedAt,
+        });
+      } catch (error) {
+        // Without this the record would stay "queued" forever with no job behind it.
+        console.error('queue send failed', scan.scanId, error);
+        await store.updateScan(scan.repo, scan.scanId, {
+          status: 'failed',
+          completedAt: new Date().toISOString(),
+          error: 'Could not queue the scan. Try again.',
+        }).catch((e) => console.error('could not mark scan failed', scan.scanId, e));
+        return res.status(503).json({ error: 'Could not queue the scan. Try again.' });
+      }
       return res.status(202).json(scan);
     } catch (error) {
       return next(error);

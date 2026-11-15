@@ -171,6 +171,22 @@ test('CORS: other origins get no allow header, including on preflight', async ()
   assert.equal(okPre.headers.get('access-control-allow-origin'), ORIGIN);
 });
 
+test('POST /scan/repo returns 503 and marks the record failed if the queue is down', async () => {
+  const send = queue.send;
+  queue.send = async () => { throw new Error('SQS unavailable'); };
+  const original = console.error; console.error = () => {};
+  try {
+    const res = await submit('https://github.com/o/queue-down');
+    assert.equal(res.status, 503);
+    assert.match((await res.json()).error, /Could not queue/);
+    const rec = await store.getLatest('o/queue-down');
+    assert.equal(rec.status, 'failed');
+    assert.ok(rec.completedAt && rec.error);
+  } finally {
+    queue.send = send; console.error = original;
+  }
+});
+
 test('existing SAST routes and /health still respond', async () => {
   assert.equal((await (await fetch(`${base}/health`)).json()).status, 'healthy');
   const scan = await fetch(`${base}/scan/code`, {

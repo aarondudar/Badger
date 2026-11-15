@@ -15,9 +15,23 @@ app.use(express.json({ limit: '10mb' }));
 // Repo routes are mounted BEFORE the global cors() below, so their origin
 // allow-list decides CORS for them; the open cors() then only covers the
 // provided SAST routes.
-// Exported so tests can drive the real app; swapped for AWS adapters later.
-export const store = createMemoryStore();
-export const queue = createMemoryQueue();
+// DynamoDB + SQS when TABLE_NAME and QUEUE_URL are set (docker compose, AWS);
+// in-memory otherwise (plain `node server.js`, unit tests).
+const useAws = Boolean(process.env.TABLE_NAME && process.env.QUEUE_URL);
+const backend = useAws
+  ? await (async () => {
+    const { getClients } = await import('./aws/clients.js');
+    const { createDynamoStore, createSqsQueue } = await import('./aws/scan-store.js');
+    const { ddb, sqs } = getClients();
+    return {
+      store: createDynamoStore({ ddb, tableName: process.env.TABLE_NAME }),
+      queue: createSqsQueue({ sqs, queueUrl: process.env.QUEUE_URL }),
+    };
+  })()
+  : { store: createMemoryStore(), queue: createMemoryQueue() };
+// Exported so tests can drive the real app.
+export const { store, queue } = backend;
+console.log(`Scan storage: ${useAws ? `DynamoDB ${process.env.TABLE_NAME} + SQS` : 'in-memory (TABLE_NAME/QUEUE_URL not set)'}`);
 app.use(createRepoRouter({
   store,
   queue,
