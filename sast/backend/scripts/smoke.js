@@ -1,8 +1,9 @@
 // Smoke test for the data layer: round-trips DynamoDB, SQS, and S3 through aws/clients.js.
 //
 // Run against the local emulator from the repo root (uses .env unchanged):
-//   docker compose up -d --wait localstack
 //   docker compose run --rm api npm run smoke
+// `run` starts the emulator first and waits until init.sh has created the resources
+// (depends_on: service_healthy). Stop it afterwards with `docker compose down`.
 //
 // Uses throwaway keys under repo "smoke/<random>" and deletes everything it writes.
 // Exits non-zero on the first failure.
