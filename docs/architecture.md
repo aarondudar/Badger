@@ -115,7 +115,7 @@ These parts of the diagram are proposals, to be settled in decision records befo
 | AWS (target) | Local (`docker compose`) |
 |---|---|
 | SQS, DynamoDB, S3 | `localstack` service running Floci ([decision 0001](decisions/0001-localstack-for-local-dev.md)), resources created by `infra/localstack/init.sh` |
-| SQS dead-letter queue | Not emulated yet |
+| SQS dead-letter queue | `scan-jobs-dlq`, also created by `init.sh`, with the same redrive policy (3 receives) |
 | ECS API service | `api` service, port 3000 |
 | ECS worker service | `worker` service |
 | ECR | Image built locally by `docker compose` |

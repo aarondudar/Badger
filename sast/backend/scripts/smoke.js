@@ -14,6 +14,8 @@ import {
   ReceiveMessageCommand,
   DeleteMessageCommand,
   ChangeMessageVisibilityCommand,
+  GetQueueAttributesCommand,
+  GetQueueUrlCommand,
 } from '@aws-sdk/client-sqs';
 import { PutCommand, QueryCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
@@ -96,6 +98,20 @@ const sqsRoundTrip = async () => {
   throw new Error('sent message was not received');
 };
 
+const deadLetterQueue = async () => {
+  const { Attributes = {} } = await sqs.send(new GetQueueAttributesCommand({
+    QueueUrl: config.queueUrl,
+    AttributeNames: ['RedrivePolicy'],
+  }));
+  if (!Attributes.RedrivePolicy) throw new Error('job queue has no redrive policy');
+
+  const { deadLetterTargetArn } = JSON.parse(Attributes.RedrivePolicy);
+  const dlqName = deadLetterTargetArn.split(':').pop();
+  // Throws if the target queue does not exist
+  await sqs.send(new GetQueueUrlCommand({ QueueName: dlqName }));
+  return dlqName;
+};
+
 const s3RoundTrip = async () => {
   const Key = reportKey(repo, scanId);
   const report = JSON.stringify({ version: 1, repo, scanId, findings: [] });
@@ -118,6 +134,7 @@ console.log(`Smoke test against ${config.endpoint ?? `AWS (${config.region})`}`)
 try {
   await check(`DynamoDB ${config.tableName}: put, latest-scan query, delete`, dynamodb);
   await check(`SQS ${config.queueUrl.split('/').pop()}: send, receive, delete`, sqsRoundTrip);
+  await check('SQS dead-letter queue: redrive policy set, target exists', deadLetterQueue);
   await check(`S3 ${config.bucketName}: put report, get, delete`, s3RoundTrip);
   console.log('All checks passed');
 } catch {
