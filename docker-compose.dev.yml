@@ -1,0 +1,23 @@
+# Dev overlay: live reload for the API and worker. Use with
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# Mounts sast/backend from your machine over the image's copy and runs node --watch, which
+# restarts the process whenever a file changes. No rebuild needed after edits.
+# The production image is unchanged: there, app files stay root-owned and read-only to the
+# `node` user. Rebuild (--build) after changing package.json.
+x-dev-backend: &dev-backend
+  volumes:
+    - ./sast/backend:/app:ro
+    # Keep the image's Linux node_modules instead of your machine's
+    - /app/node_modules
+
+services:
+  api:
+    <<: *dev-backend
+    command: ["node", "--watch", "server.js"]
+
+  worker:
+    <<: *dev-backend
+    command: ["node", "--watch", "worker/index.js"]
+    # node --watch keeps running after a crash, waiting for the next edit, so the
+    # crash-and-restart behavior used for dead-letter-queue tests needs the plain stack.
