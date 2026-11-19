@@ -131,6 +131,18 @@ cd sast/backend && npm test
 
 These don't need Docker or the emulator. CI runs the same command on every PR.
 
+### Integration tests (API storage)
+
+`test/aws-integration.test.js` round-trips the API's DynamoDB store and SQS queue against the emulator. It is skipped unless `BADGER_AWS_IT=1`. With the emulator running (`docker compose up -d localstack`), from `sast/backend`:
+
+```sh
+export BADGER_AWS_IT=1 AWS_ENDPOINT_URL=http://localhost:4566 AWS_REGION=us-east-1 AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test TABLE_NAME=scans QUEUE_URL=http://localhost:4566/000000000000/scan-jobs BUCKET_NAME=scan-reports
+npm test
+unset BADGER_AWS_IT AWS_ENDPOINT_URL AWS_REGION AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY TABLE_NAME QUEUE_URL BUCKET_NAME
+```
+
+Expect 0 skipped. The endpoint is `localhost`, not `localstack`, because the tests run on your machine, outside the compose network.
+
 ## Troubleshooting
 
 | Symptom | Fix |

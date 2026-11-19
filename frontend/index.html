@@ -3,10 +3,113 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Repo Report Card</title>
+  <title>Badger</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 48px auto; padding: 0 16px; color: #1d2330; }
+    h1 { margin: 0 0 4px; }
+    .sub { color: #5b6372; margin: 0 0 24px; }
+    form { display: flex; gap: 8px; }
+    input { flex: 1; min-width: 0; padding: 10px; border: 1px solid #c5ccd6; border-radius: 8px; font-size: 15px; }
+    button { padding: 10px 16px; border: 0; border-radius: 8px; background: #0b5394; color: #fff; font-size: 15px; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: default; }
+    #result { margin-top: 24px; padding: 16px; border: 1px solid #e1e6ec; border-radius: 8px; }
+    #result[hidden] { display: none; }
+    .error { color: #c62828; }
+    .muted { color: #5b6372; }
+    pre { background: #f3f6fa; padding: 8px; border-radius: 6px; font-size: 13px; white-space: pre-wrap; word-break: break-all; }
+  </style>
 </head>
 <body>
-  <h1>Repo Report Card</h1>
-  <!-- Placeholder: submit form, polling, grade display, badge snippet (spec section 8) -->
+  <h1>Badger</h1>
+  <p class="sub">Get a security grade badge for any public GitHub repository.</p>
+  <form id="scan-form">
+    <input id="repo-url" type="url" placeholder="https://github.com/owner/repo" required>
+    <button id="scan-button">Scan</button>
+  </form>
+  <div id="result" hidden></div>
+  <script>
+    // API base: same origin by default. When the page is hosted on S3 + CloudFront
+    // and the API lives elsewhere, set window.BADGER_API before this script runs.
+    const API = (window.BADGER_API || '').replace(/\/$/, '');
+    const POLL_MS = 3000;
+    const MAX_POLLS = 100; // ~5 minutes
+
+    const form = document.getElementById('scan-form');
+    const button = document.getElementById('scan-button');
+    const result = document.getElementById('result');
+
+    // Build output with DOM nodes, never innerHTML, so API text can't inject markup.
+    const el = (tag, props = {}, ...children) => {
+      const node = Object.assign(document.createElement(tag), props);
+      node.append(...children);
+      return node;
+    };
+    const show = (...nodes) => { result.hidden = false; result.replaceChildren(...nodes); };
+    const showError = (message) => show(el('p', { className: 'error', textContent: message }));
+
+    const getJson = async (url, options) => {
+      const response = await fetch(url, options);
+      let body = {};
+      try { body = await response.json(); } catch { /* non-JSON error page */ }
+      if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
+      return body;
+    };
+
+    const showComplete = (scan) => {
+      const badgeUrl = new URL(`${API}/badge/${scan.repo}`, location.href).href;
+      const snippet = `[![security](${badgeUrl})](https://github.com/${scan.repo})`;
+      const summary = scan.grade === 'N/A'
+        ? 'No JavaScript or TypeScript files found, so there is nothing to grade.'
+        : `Grade ${scan.grade} (score ${scan.score}/100)`;
+      const counts = scan.counts
+        ? `${scan.counts.high} high, ${scan.counts.medium} medium, ${scan.counts.low} low across ${scan.jsFilesScanned} files`
+        : '';
+      const copy = el('button', { type: 'button', textContent: 'Copy' });
+      copy.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(snippet); copy.textContent = 'Copied'; }
+        catch { copy.textContent = 'Select and copy manually'; }
+      });
+      show(
+        el('p', {}, el('strong', { textContent: scan.repo }), `: ${summary}`),
+        counts ? el('p', { className: 'muted', textContent: counts }) : '',
+        // Query string busts the 5-minute cache so the fresh grade shows here.
+        el('img', { src: `${badgeUrl}?v=${encodeURIComponent(scan.scanId)}`, alt: `security grade ${scan.grade}` }),
+        el('p', { className: 'muted', textContent: 'Add this to your README:' }),
+        el('pre', { textContent: snippet }),
+        copy,
+      );
+    };
+
+    const poll = async (repo, attempt = 0) => {
+      try {
+        const scan = await getJson(`${API}/grade/${repo}`);
+        if (scan.status === 'complete') return showComplete(scan);
+        if (scan.status === 'failed') return showError(`Scan failed: ${scan.error || 'unknown error'}`);
+        if (attempt >= MAX_POLLS) return showError('Still scanning after 5 minutes. Check back later.');
+        show(el('p', { className: 'muted', textContent: `Scanning ${repo}... (${scan.status})` }));
+        setTimeout(() => poll(repo, attempt + 1), POLL_MS);
+      } catch (error) {
+        showError(`Could not check scan status: ${error.message}`);
+      }
+    };
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      button.disabled = true;
+      try {
+        const scan = await getJson(`${API}/scan/repo`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repoUrl: document.getElementById('repo-url').value }),
+        });
+        show(el('p', { className: 'muted', textContent: `Queued ${scan.repo}...` }));
+        await poll(scan.repo);
+      } catch (error) {
+        showError(error.message === 'Failed to fetch' ? 'Could not reach the Badger API.' : error.message);
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
 </body>
 </html>

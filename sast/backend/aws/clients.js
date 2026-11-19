@@ -11,12 +11,12 @@
 // Nothing is built at import time, so modules (and their tests) can import this file
 // without AWS configuration; the first getClients()/getConfig() call validates it.
 
-import { SQSClient } from '@aws-sdk/client-sqs';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
-import { S3Client } from '@aws-sdk/client-s3';
+import { SQSClient } from "@aws-sdk/client-sqs";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { S3Client } from "@aws-sdk/client-s3";
 
-const REQUIRED = ['AWS_REGION', 'QUEUE_URL', 'TABLE_NAME', 'BUCKET_NAME'];
+const REQUIRED = ["AWS_REGION", "QUEUE_URL", "TABLE_NAME", "BUCKET_NAME"];
 
 /**
  * Reads and validates AWS settings from the environment.
@@ -25,7 +25,9 @@ const REQUIRED = ['AWS_REGION', 'QUEUE_URL', 'TABLE_NAME', 'BUCKET_NAME'];
 export const getConfig = (env = process.env) => {
   const missing = REQUIRED.filter((name) => !env[name]);
   if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+    throw new Error(
+      `Missing required environment variables: ${missing.join(", ")}`,
+    );
   }
 
   return Object.freeze({

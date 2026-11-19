@@ -1,13 +1,47 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { scanCode, scanFile, scanDirectory } from './scanner.js';
+import { createRepoRouter } from './routes/repo.js';
+import { createMemoryQueue, createMemoryStore } from './store.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Middleware
-app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+// Repo routes are mounted BEFORE the global cors() below, so their origin
+// allow-list decides CORS for them; the open cors() then only covers the
+// provided SAST routes.
+// DynamoDB + SQS when TABLE_NAME and QUEUE_URL are set (docker compose, AWS);
+// in-memory otherwise (plain `node server.js`, unit tests).
+const useAws = Boolean(process.env.TABLE_NAME && process.env.QUEUE_URL);
+const backend = useAws
+  ? await (async () => {
+    // getConfig() validates every required variable (incl. AWS_REGION, BUCKET_NAME)
+    // and fails at startup, listing what's missing.
+    const { getClients, getConfig } = await import('./aws/clients.js');
+    const { createDynamoStore, createSqsQueue } = await import('./aws/scan-store.js');
+    const { tableName, queueUrl } = getConfig();
+    const { ddb, sqs } = getClients();
+    return {
+      store: createDynamoStore({ ddb, tableName }),
+      queue: createSqsQueue({ sqs, queueUrl }),
+    };
+  })()
+  : { store: createMemoryStore(), queue: createMemoryQueue() };
+// Exported so tests can drive the real app.
+export const { store, queue } = backend;
+console.log(`Scan storage: ${useAws ? `DynamoDB ${process.env.TABLE_NAME} + SQS` : 'in-memory (TABLE_NAME/QUEUE_URL not set)'}`);
+app.use(createRepoRouter({
+  store,
+  queue,
+  allowedOrigins: (process.env.ALLOWED_ORIGINS || `http://localhost:${PORT}`).split(','),
+}));
+app.use(cors());
+app.use(express.static(path.resolve(__dirname, '../../frontend')));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -198,8 +232,11 @@ app.get('/vulnerabilities', (req, res) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
+export default app;
+
+// Start server only when run directly (npm start / docker), not when imported by tests.
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) app.listen(PORT, () => {
   console.log(`
   ╔═══════════════════════════════════════════╗
   ║         SAST Scanner Server               ║

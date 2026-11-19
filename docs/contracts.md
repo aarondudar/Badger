@@ -18,6 +18,7 @@ Request:
 
 - `202`: `{ "scanId": "2026-10-21T18:04:11.532Z_a1b2c3", "repo": "owner/name", "status": "queued" }`. The `queued` record is written and the job message sent before responding.
 - `400`: `repoUrl` missing or invalid (see [URL validation](#url-validation)). Nothing is written or queued.
+- `503`: the record was written but the job message could not be sent. The record is marked `failed` with `error: "Could not queue the scan. Try again."`, so it never sits in `queued` with no job behind it.
 
 ### `GET /grade/:owner/:repo`
 

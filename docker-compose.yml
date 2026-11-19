@@ -26,6 +26,10 @@ services:
     env_file: .env
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
+    volumes:
+      # The image is built from sast/backend only, so frontend/ is not in it. server.js serves
+      # ../../frontend relative to /app, i.e. /frontend. Until Milestone 4 (S3 + CloudFront).
+      - ./frontend:/frontend:ro
     depends_on:
       localstack:
         condition: service_healthy
