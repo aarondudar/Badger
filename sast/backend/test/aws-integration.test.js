@@ -1,9 +1,11 @@
 // Integration test against a real DynamoDB/SQS (the Floci emulator from docker compose).
-// Skipped unless BADGER_AWS_IT=1. From the repo root, with `docker compose up -d` running:
-//   cd sast/backend
-//   BADGER_AWS_IT=1 AWS_ENDPOINT_URL=http://localhost:4566 AWS_REGION=us-east-1 \
-//   AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test TABLE_NAME=scans \
-//   QUEUE_URL=http://localhost:4566/000000000000/scan-jobs npm test
+// Skipped unless BADGER_AWS_IT=1. From the repo root, start the emulator:
+//   docker compose up -d localstack
+// then from sast/backend (one line, so nothing is lost when pasting):
+//   export BADGER_AWS_IT=1 AWS_ENDPOINT_URL=http://localhost:4566 AWS_REGION=us-east-1 AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test TABLE_NAME=scans QUEUE_URL=http://localhost:4566/000000000000/scan-jobs BUCKET_NAME=scan-reports
+//   npm test
+// aws/clients.js requires all of AWS_REGION, QUEUE_URL, TABLE_NAME and BUCKET_NAME.
+// Clean up afterwards: unset BADGER_AWS_IT AWS_ENDPOINT_URL AWS_REGION AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY TABLE_NAME QUEUE_URL BUCKET_NAME
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 

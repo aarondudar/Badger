@@ -20,12 +20,15 @@ app.use(express.json({ limit: '10mb' }));
 const useAws = Boolean(process.env.TABLE_NAME && process.env.QUEUE_URL);
 const backend = useAws
   ? await (async () => {
-    const { getClients } = await import('./aws/clients.js');
+    // getConfig() validates every required variable (incl. AWS_REGION, BUCKET_NAME)
+    // and fails at startup, listing what's missing.
+    const { getClients, getConfig } = await import('./aws/clients.js');
     const { createDynamoStore, createSqsQueue } = await import('./aws/scan-store.js');
+    const { tableName, queueUrl } = getConfig();
     const { ddb, sqs } = getClients();
     return {
-      store: createDynamoStore({ ddb, tableName: process.env.TABLE_NAME }),
-      queue: createSqsQueue({ sqs, queueUrl: process.env.QUEUE_URL }),
+      store: createDynamoStore({ ddb, tableName }),
+      queue: createSqsQueue({ sqs, queueUrl }),
     };
   })()
   : { store: createMemoryStore(), queue: createMemoryQueue() };
